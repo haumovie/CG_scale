@@ -9,12 +9,13 @@
 
 
 
-//** Uncomment one of the two lines below to enable either serial 16x2 character display or i2c 16x2 character display:
+//** Uncomment one of the three lines below to enable either serial 16x2 character display, i2c 16x2 character display or OLED monochrome display:
 //#define USE_SERDISP
-#define USE_I2CDISP
+//#define USE_I2CDISP
+#define USE_OLEDI2CDISP
 
 //** If using i2c display, set correct i2c address (if you don't know, use the i2c Scanner sketch: https://playground.arduino.cc/Main/I2cScanner/):
-#define I2CDISP_ADR 0x20
+#define I2CDISP_ADR 0x3C
 
 //** Uncomment to enable optional EEPROM storing of loadcell calibration value (ldcell_1_calfactor and ldcell_2_calfactor):
 #define USE_EEPROM
