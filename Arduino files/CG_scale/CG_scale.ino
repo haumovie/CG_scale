@@ -1,10 +1,11 @@
 
 
+
 /*
    CG scale for F3F & F3B models
    Olav Kallhovd, 2016-2021
+   Mod for OLED by Christian Taylor Hauschild
 */
-#define VERSION "CG Scale SW v1.2.1"
 
 #include "config.h"
 #if defined USE_EEPROM
@@ -32,43 +33,40 @@
 HX711_ADC LoadCell_1(LoadCell_1_DOUT_pin, LoadCell_1_SCK_pin);
 HX711_ADC LoadCell_2(LoadCell_2_DOUT_pin, LoadCell_2_SCK_pin);
 
-#define LCD_LEN 16
+// #define LCD_LEN 16
 
-//** declare OLED stuff:
-#ifdef USE_OLEDI2CDISP
-#include <SSD1306Ascii.h>;
-#include <SSD1306AsciiAvrI2c.h>;
-#include <SSD1306AsciiSoftSpi.h>;
-#include <SSD1306AsciiSpi.h>;
-#include <SSD1306AsciiWire.h>;
-#include <SSD1306init.h>;
-#endif
-
-//** i2c LCD librarys and declaration:
+//** i2c librarys and declaration:
 #ifdef USE_I2CDISP
 #include <Wire.h>
-#include <LiquidCrystal_I2C.h> //can be installed from the library manager
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 64 // OLED display height, in pixels
+// #include <LiquidCrystal_I2C.h> //can be installed from the library manager
 
-//** declare i2c lcd object:
-#ifdef USE_CUSTOM_I2C_PINS
-//** declare custom pin i2c lcd object:
-LiquidCrystal_I2C  lcdI2C(I2CDISP_ADR, En_pin, Rw_pin, Rs_pin, D4_pin, D5_pin, D6_pin, D7_pin);
-#else
+//** declare custom pin i2c lcd object (optional):
+//LiquidCrystal_I2C  lcdI2C(I2CDISP_ADR, En_pin, Rw_pin, Rs_pin, D4_pin, D5_pin, D6_pin, D7_pin);
+
 //** declare standard pin i2c lcd object:
-LiquidCrystal_I2C lcdI2C(I2CDISP_ADR, 16, 2);
+//LiquidCrystal_I2C lcdI2C(I2CDISP_ADR, 16, 2);
 #endif
-#endif
-byte seroutput = 0; //0: Serial LCD display, 1: Wt+CG+loadcell value, 2: other (calibration etc.)
+
+// byte seroutput = 0; //0: Serial LCD display, 1: Wt+CG+loadcell value, 2: other (calibration etc.)
 
 
-//***
-#ifdef USE_I2CDISP
+//**
+
+//** Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+//**
+
 void setup() {
-  Serial.begin(9600); //don't change if you use the serial LCD display option
+  Serial.begin(115200);
+
   printMenu();
-  setupLCD();
+  setupOLED();
   setupLoadcells();
-#endif
 
 #ifdef USE_ZERO_BUTTON
   pinMode(zero_button_pin, INPUT_PULLUP); //optional led
@@ -78,7 +76,8 @@ void setup() {
   pinMode(led_pin, OUTPUT); //optional led
   digitalWrite(led_pin, HIGH);
 #endif
-  }
+}
+
 
 //***
 void loop() {
@@ -99,50 +98,31 @@ void loop() {
 }
 
 
-//*** set up LCD:
-void setupLCD() {
-#ifdef USE_I2CDISP
-  lcdI2C.begin(16, 2);
-  lcdI2C.setBacklight(1);
-#endif
-
-  char lcdtext[LCD_LEN + 1] = {"F3X COG scale   "};
-  printToLCD(lcdtext, 0);
-  char lcdtext2[LCD_LEN + 1] = {"Wait...         "};
-  printToLCD(lcdtext2, 1);
-}
-
 //*** set up OLED:
-#ifdef USE_OLEDI2CDISP
-  void setupOLED()  {
-// maybe Delay to allow loadcells to stabilise?:
-//  delay(2000);
- 
-// Clear the display
+void setupOLED() {
+#ifdef USE_I2CDISP
+if(!display.begin(SSD1306_SWITCHCAPVCC, I2CDISP_ADR)) { // Address 0x3D for 128x64
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;);
+  }
+#endif
+delay(2000);
   display.clearDisplay();
-//Set the color - always use white despite actual display color
+
+  display.setTextSize(1);
   display.setTextColor(WHITE);
-//Set the font size
-  display.setTextSize(2);
-//Set the cursor coordinates
-  display.setCursor(0,0); 
-  display.print("Total weight: "); 
-  display.print(weightTot);
-  display.print(" g");
-  display.setCursor(0,10);
-  display.print("GoG: "); 
-  display.print(CG);
-  display.print(" mm");
-  display.print("Batterylevel: ");
-  display.print(battvalue);
-  display.print(" V");
+  display.setCursor(0, 10);
+  // Display startup text
+  display.println("F3X CoG Scale");
+  display.setCursor(0,20);
+  display.printIn("By Olav Kallhovd")
+  display.display(); 
 }
+
 void loop() {
-  setupOLED();
-  display.display();
+  
 }
-#endif  
-}
+
 
 //*** set up loadcells and calibration values:
 void setupLoadcells() {
@@ -160,7 +140,7 @@ void setupLoadcells() {
   if (EEPROM.read(ADR_LDCELL1_IS_CAL) == IS_CAL_VAL) {
     EEPROM.get(ADR_LDCELL1_CAL, ldcell_1_calfactor);
   }
-  if (EEPROM.read(ADR_LDCELL2_IS_CAL) == IS_CAL_VAL) {
+  if (EEPROM.read(ADR_LDCELL1_IS_CAL) == IS_CAL_VAL) {
     EEPROM.get(ADR_LDCELL2_CAL, ldcell_2_calfactor);
   }
   if (EEPROM.read(ADR_BATVOLT_IS_CAL) == IS_CAL_VAL) {
@@ -331,7 +311,6 @@ void printToLCD(char *lcdtext, byte lineno) {
 //*** print serial input menu:
 void printMenu() {
   Serial.println();
-  Serial.println(F(VERSION));
   Serial.println(F("Menu:"));
   Serial.println(F("Send 's' to enable weight/CG output to Serial Monitor"));
   Serial.println(F("Send 'z' to set zero offset"));
